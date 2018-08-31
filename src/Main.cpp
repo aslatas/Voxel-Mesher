@@ -40,20 +40,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-using std::cout;
-using std::cerr;
-using std::endl;
-using std::string;
-using std::vector;
-using std::pair;
-using std::to_string;
-
-
 class MyGLCanvas : public nanogui::GLCanvas {
 public:
     MyGLCanvas(Widget *parent) : nanogui::GLCanvas(parent), mRotation(nanogui::Vector3f(0.25f, 0.5f, 0.33f)) {
-        using namespace nanogui;
-
         mShader.init(
             /* An identifying name */
             "a_simple_shader",
@@ -78,7 +67,7 @@ public:
             "}"
         );
 
-        MatrixXu indices(3, 20); /* Draw a cube */
+        nanogui::MatrixXu indices(3, 20);
         indices.col( 0) <<  0,  2,  1;
         indices.col( 1) <<  0,  3,  2;
         indices.col( 2) <<  0,  4,  3;
@@ -100,7 +89,7 @@ public:
         indices.col(18) << 11,  9, 10;
         indices.col(19) << 11, 10,  6;
 
-        MatrixXf positions(3, 12);
+        nanogui::MatrixXf positions(3, 12);
         positions.col( 0) <<       0.0f,       1.0f,       0.0f;
         positions.col( 1) <<       0.0f,  0.447215f, -0.894414f;
         positions.col( 2) <<  0.850649f,  0.447215f, -0.276393f;
@@ -114,7 +103,7 @@ public:
         positions.col(10) <<  0.850641f, -0.447215f,  0.276385f;
         positions.col(11) <<       0.0f,      -1.0f,       0.0f;
 
-        MatrixXf colors(3, 12);
+        nanogui::MatrixXf colors(3, 12);
         colors.col( 0) <<    1,    0,    0;
         colors.col( 1) <<    0,    1,    0;
         colors.col( 2) <<    0,    1,    1;
@@ -226,7 +215,7 @@ int main(int /* argc */, char ** /* argv */) {
         nanogui::shutdown();
     } catch (const std::runtime_error &e) {
         std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
-        std::cerr << error_msg << endl;
+        std::cerr << error_msg << std::endl;
         return -1;
     }
 
