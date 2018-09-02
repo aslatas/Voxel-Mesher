@@ -5,15 +5,15 @@
  * LICENSE.txt file. This application is distributed under a similar BSD style
  * license. More information is available in the top level LICENSE.txt file.
  *
- * Draws an icosahedron inside a NanoGUI canvas. Has buttons to randomize 
- * rotation and background color of the canvas. 
+ * Draws an icosahedron inside a NanoGUI canvas. Has buttons to randomize
+ * rotation and background color of the canvas.
  * @author Matthew McLaurin
  * @TODO Create a struct to house vertex information.
  * @TODO SceneObject class which has modifiable world transform.
  * @TODO Custom free rotating perspective camera.
  */
 
-// NanoGUI includes.
+ // NanoGUI includes.
 #include <nanogui/opengl.h>
 #include <nanogui/glutil.h>
 #include <nanogui/screen.h>
@@ -205,77 +205,119 @@ private:
 };
 
 /**
- *
- *
- *
+ * @class GuiApp
+ * Wrapper for NanoGui Screen class. Creates the GLFW window with default
+ * parameters. Adds top level UI widgets and redirects input.
  */
-class ExampleApplication : public nanogui::Screen
+class GuiApp : public nanogui::Screen
 {
 public:
-    ExampleApplication() : nanogui::Screen(Eigen::Vector2i(800, 600), "GUI Prototype", false, false, 8, 8, 24, 8, 2, 4, 1)
+    /**
+     * Constructor creates window and sets base behavior. Uses 8 bit color,
+     * depth and stencil buffered. Screen is windowed and non-resizeable.
+     */
+    GuiApp() : nanogui::Screen(Eigen::Vector2i(800, 600), "GUI Prototype",
+        false, false, 8, 8, 24, 8, 2, 4, 1)
     {
-        using namespace nanogui;
+        // Create a UI window within the screen, with a title and layout.
+        nanogui::Window *window = new nanogui::Window(this, "I'm a Canvas!");
+        window->setLayout(new nanogui::GroupLayout());
 
-        Window *window = new Window(this, "I'm a Canvas!");
-        window->setLayout(new GroupLayout());
-
+        // Add a GL canvas to the window, with background color and size.
         mCanvas = new Canvas(window);
         mCanvas->setBackgroundColor({ 60, 60, 60, 255 });
         mCanvas->setSize({ 400, 400 });
 
-        Widget *tools = new Widget(window);
-        tools->setLayout(new BoxLayout(Orientation::Horizontal,
-            Alignment::Middle, 0, 5));
+        // Make an empty box layout widget to position the canvas and buttons.
+        nanogui::Widget *tools = new nanogui::Widget(window);
+        tools->setLayout(new nanogui::BoxLayout(
+            nanogui::Orientation::Horizontal,
+            nanogui::Alignment::Middle, 0, 5));
 
-        Button *b0 = new Button(tools, "Random Color");
-        b0->setCallback([this]() { mCanvas->setBackgroundColor(Vector4i(rand() % 256, rand() % 256, rand() % 256, 255)); });
+        // Add color button, which randomizes background color on press.
+        nanogui::Button *b0 = new nanogui::Button(tools, "Random Color");
+        b0->setCallback([this]() { mCanvas->setBackgroundColor(nanogui::Vector4i(rand() % 256, rand() % 256, rand() % 256, 255)); });
 
-        Button *b1 = new Button(tools, "Random Rotation");
+        // Add rotate button, which randomizes current rotation on press.
+        nanogui::Button *b1 = new nanogui::Button(tools, "Random Rotation");
         b1->setCallback([this]() { mCanvas->setRotation(nanogui::Vector3f((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f)); });
         window->center();
 
+        // Lay out the UI elements.
         performLayout();
     }
 
+    /**
+     * Callback for keyboard input. Sets the screen to invisible if ESC
+     * is pressed.
+     * @param key Hardware code for the key input.
+     * @param scancode Platform specific interpretation of the keycode.
+     * @param action Type of input, such as press or release.
+     * @param modifiers Held modifier keys, such as shift or ctrl.
+     * @return True if input has been handled. Used for layered input handling.
+     */
     virtual bool keyboardEvent(int key, int scancode, int action, int modifiers)
     {
+        // If the input was handled by the outer screen, do nothing.
         if (Screen::keyboardEvent(key, scancode, action, modifiers))
             return true;
+
+        // If the ESC key was pressed, set invisible and report input handled.
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
             setVisible(false);
             return true;
         }
+
+        // If input went unhandled, return false.
         return false;
     }
 
+    /**
+     * Draws the screen in its current state.
+     * @param ctx NanoGUI context to use for drawing.
+     */
     virtual void draw(NVGcontext *ctx)
     {
-        /* Draw the user interface */
+        // Draw parent screen.
         Screen::draw(ctx);
     }
 private:
+    /** GL Canvas to use for the 3D viewport. */
     Canvas *mCanvas;
 };
 
-int main(int /* argc */, char ** /* argv */)
+/**
+ * Application launch point. Initializes components, creates the window, and
+ * begins the draw loop. Initiates shutdown once the application loop ends.
+ * @param argc Number of command line arguments..
+ * @param argv Command line arguments, unused.
+ * @return Exit code, zero on success.
+ */
+int main(int argc , char ** argv)
 {
+    // Try to initialize nanogui and subcomponents.
     try {
         nanogui::init();
 
-        /* scoped variables */ {
-            nanogui::ref<ExampleApplication> app = new ExampleApplication();
+        // If successful, set scoped variables, draw UI, and start main loop.
+        {
+            nanogui::ref<GuiApp> app = new GuiApp();
             app->drawAll();
             app->setVisible(true);
             nanogui::mainloop();
         }
 
+        // After loop completes, shutdown NanoGUI.
         nanogui::shutdown();
     }
+
+    // If NanoGUI failed to initialize, print stacktrace and exit in error.
     catch (const std::runtime_error &e) {
         std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
         std::cerr << error_msg << std::endl;
         return -1;
     }
-
+    
+    // If program completed and NanoGUI shut down, exit in success.
     return 0;
 }
