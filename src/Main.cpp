@@ -47,6 +47,7 @@ class Canvas : public nanogui::GLCanvas
 {
 public:
 
+
     /**
      * Constructor creates the GL Canvas in the specified parent Widget.
      * Creates vertex and index buffers and shaders.
@@ -60,7 +61,7 @@ public:
         if (!mShader.initFromFiles("VertexColor", "../resources/shaders/VertexColor.vert", "../resources/shaders/VertexColor.frag")) {
             std::cerr << "Failed to initialize shaders." << std::endl;
         }
-        
+
 
         // Index buffer. Counter-clockwise winding order.
         nanogui::MatrixXu indices(3, 20);
@@ -121,9 +122,12 @@ public:
         mShader.uploadAttrib("position", positions);
         mShader.uploadAttrib("color", colors);
 
-        // Initialize model-view-projection matrix to identity, and scale down.
-        mvp.setIdentity();
-        mvp *= nanogui::scale(nanogui::Vector3f(0.5f, 0.5f, 0.5f));
+        // Initialize transforms.
+        projection = nanogui::frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 10.0f);
+        view = nanogui::lookAt(nanogui::Vector3f(0.0f, 0.0f, -2.0f), nanogui::Vector3f(0.0f, 0.0f, 0.0f), nanogui::Vector3f(0.0f, 1.0f, 0.0f));
+        model.setIdentity();
+
+
     }
 
     /**
@@ -144,35 +148,65 @@ public:
     {
         // Use the Canvas' shader program. Includes vertex data.
         mShader.bind();
-
-        // Get current frame time.
-        float fTime = (float)glfwGetTime();
-        // Rotate by current frame rotation amount, concatenating three single-axis rotations.
-        //mvp.topLeftCorner<3, 3>() = Eigen::Matrix3f(Eigen::AngleAxisf(mRotation[0] * fTime, nanogui::Vector3f::UnitX()) *
-            //Eigen::AngleAxisf(mRotation[1] * fTime, nanogui::Vector3f::UnitY()) *
-           // Eigen::AngleAxisf(mRotation[2] * fTime, nanogui::Vector3f::UnitZ())) * 0.25f;
-
-        // Send transform matrix to the shader program.
+        
+        // Update transform matrix and send it to the shader.
+        mvp = projection * view * model;
         mShader.setUniform("modelViewProj", mvp);
 
-        // Enable depth testing of the canvas objects.
         glEnable(GL_DEPTH_TEST);
         // Draw triangles, assuming the shader has vertex and index data.
         mShader.drawIndexed(GL_TRIANGLES, 0, 20);
         glDisable(GL_DEPTH_TEST);
     }
-    
 
-    virtual bool mouseDragEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override
+    /**
+     * Callback for mouse click input. Updates initial location for drag events upon right click.
+     * @param p Cursor screen position.
+     * @param button Mouse button responsible for the event.
+     * @param down True if the event represents a press, false for a release.
+     * @param modifiers Held modifer keys, such as ctrl or shift.
+     * @return True if this event handled the mouse input, false otherwise.
+     */
+    virtual bool mouseButtonEvent(const nanogui::Vector2i &p, int button, bool down, int modifiers) override
     {
-        if (button == 2) {
-            Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();
-            rotation.topLeftCorner<3, 3>() = Eigen::Matrix3f(Eigen::AngleAxisf((p.x() - lastPos.x()) * sens, Eigen::Vector3f::UnitZ()) * Eigen::AngleAxisf((p.y() - lastPos.y()) * sens, Eigen::Vector3f::UnitX()));
-            mvp *= rotation;
-            lastPos = p;
+        // If right click is pressed, update last position and return true.
+        if (down && button == 1) {
+            dragPos = p;
             return true;
         }
 
+        // If input wasn't handled, return false.
+        return false;
+    }
+
+    /**
+     * Callback for mouse drag input. On right click and drag, rotates the canvas object.
+     * @param p Cursor screen position.
+     * @param rel Cursor release position.
+     * @param button Mouse button responsible for the event.
+     * @param modifiers Modifier keys held, such as ctrl or shift.
+     * @return True if this event handled the input, false otherwise.
+     */
+    virtual bool mouseDragEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override
+    {
+        // If right click is held, update model rotation.
+        if (button == 2) {
+            // Store rotation in a quaternion, using last mouse position and current mouse position to generate angle.
+            Eigen::Quaternionf xRot, yRot;
+            xRot = Eigen::Quaternionf(Eigen::AngleAxisf((dragPos.y() - p.y()) * sens, nanogui::Vector3f::UnitX()));
+            yRot = Eigen::Quaternionf(Eigen::AngleAxisf((p.x() - dragPos.x()) * sens, nanogui::Vector3f::UnitY()));
+
+            // Generate rotation matrix and apply it to the model matrix.
+            nanogui::Matrix4f transform = nanogui::Matrix4f::Identity();
+            transform.topLeftCorner<3, 3>() = (xRot * yRot).toRotationMatrix();
+            model = transform * model;
+
+            // Update last position and return true.
+            dragPos = p;
+            return true;
+        }
+
+        // If no input was handled, return false.
         return false;
     }
 
@@ -181,11 +215,16 @@ private:
     nanogui::GLShader mShader;
     /** Transform matrix for the rendered shape. */
     nanogui::Matrix4f mvp;
+    /** Perspective projection matrix. */
+    nanogui::Matrix4f projection;
+    /** View matrix. */
+    nanogui::Matrix4f view;
+    /** Model matrix. */
+    nanogui::Matrix4f model;
     /** Mouse sensitivity. */
     float sens = 0.01f;
     /** Last position of the mouse, used for mouse dragging. */
-    Eigen::Vector2i lastPos = Eigen::Vector2i(0, 0);
-
+    Eigen::Vector2i dragPos = Eigen::Vector2i(0, 0);
 };
 
 /**
@@ -223,7 +262,7 @@ public:
         b0->setCallback([this]() { mCanvas->setBackgroundColor(nanogui::Vector4i(rand() % 256, rand() % 256, rand() % 256, 255)); });
 
         // Add rotate button, which randomizes current rotation on press.
-        nanogui::Button *b1 = new nanogui::Button(tools, "Random Rotation");
+        nanogui::Button *b1 = new nanogui::Button(tools, "Do Nothing");
         window->center();
 
         // Lay out the UI elements.
@@ -266,7 +305,7 @@ public:
     }
 private:
     /** GL Canvas to use for the 3D viewport. */
-    Canvas *mCanvas;
+    Canvas * mCanvas;
 };
 
 /**
@@ -276,7 +315,7 @@ private:
  * @param argv Command line arguments, unused.
  * @return Exit code, zero on success.
  */
-int main(int argc , char ** argv)
+int main(int argc, char ** argv)
 {
     // Try to initialize nanogui and subcomponents.
     try {
@@ -300,7 +339,7 @@ int main(int argc , char ** argv)
         std::cerr << error_msg << std::endl;
         return -1;
     }
-    
+
     // If program completed and NanoGUI shut down, exit in success.
     return 0;
 }
