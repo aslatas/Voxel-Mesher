@@ -29,7 +29,6 @@
 #include <iostream>
 #include <string>
 
-// @TODO Refactor Texture class to use safer file read (just for fun).
 // Includes for the GLTexture class. 
 #include <cstdint>
 #include <memory>
@@ -49,44 +48,19 @@ class Canvas : public nanogui::GLCanvas
 public:
 
     /**
-     * Constructor creates the GL Canvas in the specified parent Widget, with
-     * optional initial rotation. Creates vertex and index buffers and shaders.
+     * Constructor creates the GL Canvas in the specified parent Widget.
+     * Creates vertex and index buffers and shaders.
      * @param parent Parent Widget in which the canvas will be constructed.
      * @TODO Move shaders into separate files. Look into serializing them.
      * @TODO Refactor shader inputs as a uniform buffer object.
      */
-    Canvas(Widget *parent) : nanogui::GLCanvas(parent),
-        mRotation(nanogui::Vector3f(0.25f, 0.5f, 0.33f))
+    Canvas(Widget *parent) : nanogui::GLCanvas(parent)
     {
         // Initialize the shader program and the vertex array object.
-        mShader.init(
-            // Shader Program identifier.
-            "VertexColorShader",
-
-            /* Vertex shader for GL 4.1.
-             * Takes in a vertex position, transform matrix, and color. Sets
-             * position using matrix passes color the fragment shader.
-             */
-            "#version 410\n"
-            "uniform mat4 modelViewProj;\n"
-            "in vec3 position;\n"
-            "in vec3 color;\n"
-            "out vec4 frag_color;\n"
-            "void main() {\n"
-            "    frag_color = vec4(color, 1.0);\n"
-            "    gl_Position = modelViewProj * vec4(position, 1.0);\n"
-            "}",
-
-            /* Fragment shader for GL 4.1.
-             * Takes a color from the vertex shader, uses it as fragment color.
-             */
-            "#version 410\n"
-            "out vec4 color;\n"
-            "in vec4 frag_color;\n"
-            "void main() {\n"
-            "    color = frag_color;\n"
-            "}"
-        );
+        if (!mShader.initFromFiles("VertexColor", "../resources/shaders/VertexColor.vert", "../resources/shaders/VertexColor.frag")) {
+            std::cerr << "Failed to initialize shaders." << std::endl;
+        }
+        
 
         // Index buffer. Counter-clockwise winding order.
         nanogui::MatrixXu indices(3, 20);
@@ -146,6 +120,10 @@ public:
         mShader.uploadIndices(indices);
         mShader.uploadAttrib("position", positions);
         mShader.uploadAttrib("color", colors);
+
+        // Initialize model-view-projection matrix to identity, and scale down.
+        mvp.setIdentity();
+        mvp *= nanogui::scale(nanogui::Vector3f(0.5f, 0.5f, 0.5f));
     }
 
     /**
@@ -158,15 +136,6 @@ public:
     }
 
     /**
-     * Set the per-second rotation transform as euler angles.
-     * @param vRotation Euler-angle rotation rate, in radians/second.
-     */
-    void setRotation(nanogui::Vector3f vRotation)
-    {
-        mRotation = vRotation;
-    }
-
-    /**
      * Canvas render method draws to back-buffer.
      * Called per frame before swapping buffers. Put custom
      * draw logic here.
@@ -176,16 +145,12 @@ public:
         // Use the Canvas' shader program. Includes vertex data.
         mShader.bind();
 
-        // Initialize model-view-projectoin matrix to identity.
-        nanogui::Matrix4f mvp;
-        mvp.setIdentity();
-
         // Get current frame time.
         float fTime = (float)glfwGetTime();
         // Rotate by current frame rotation amount, concatenating three single-axis rotations.
-        mvp.topLeftCorner<3, 3>() = Eigen::Matrix3f(Eigen::AngleAxisf(mRotation[0] * fTime, nanogui::Vector3f::UnitX()) *
-            Eigen::AngleAxisf(mRotation[1] * fTime, nanogui::Vector3f::UnitY()) *
-            Eigen::AngleAxisf(mRotation[2] * fTime, nanogui::Vector3f::UnitZ())) * 0.25f;
+        //mvp.topLeftCorner<3, 3>() = Eigen::Matrix3f(Eigen::AngleAxisf(mRotation[0] * fTime, nanogui::Vector3f::UnitX()) *
+            //Eigen::AngleAxisf(mRotation[1] * fTime, nanogui::Vector3f::UnitY()) *
+           // Eigen::AngleAxisf(mRotation[2] * fTime, nanogui::Vector3f::UnitZ())) * 0.25f;
 
         // Send transform matrix to the shader program.
         mShader.setUniform("modelViewProj", mvp);
@@ -196,12 +161,31 @@ public:
         mShader.drawIndexed(GL_TRIANGLES, 0, 20);
         glDisable(GL_DEPTH_TEST);
     }
+    
+
+    virtual bool mouseDragEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override
+    {
+        if (button == 2) {
+            Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();
+            rotation.topLeftCorner<3, 3>() = Eigen::Matrix3f(Eigen::AngleAxisf((p.x() - lastPos.x()) * sens, Eigen::Vector3f::UnitZ()) * Eigen::AngleAxisf((p.y() - lastPos.y()) * sens, Eigen::Vector3f::UnitX()));
+            mvp *= rotation;
+            lastPos = p;
+            return true;
+        }
+
+        return false;
+    }
 
 private:
     /** Canvas shader object. Contains both the shader program and VAOs.*/
     nanogui::GLShader mShader;
-    /**  Transform rotation rate as Euler angles. */
-    Eigen::Vector3f mRotation;
+    /** Transform matrix for the rendered shape. */
+    nanogui::Matrix4f mvp;
+    /** Mouse sensitivity. */
+    float sens = 0.01f;
+    /** Last position of the mouse, used for mouse dragging. */
+    Eigen::Vector2i lastPos = Eigen::Vector2i(0, 0);
+
 };
 
 /**
@@ -240,7 +224,6 @@ public:
 
         // Add rotate button, which randomizes current rotation on press.
         nanogui::Button *b1 = new nanogui::Button(tools, "Random Rotation");
-        b1->setCallback([this]() { mCanvas->setRotation(nanogui::Vector3f((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f)); });
         window->center();
 
         // Lay out the UI elements.
@@ -262,7 +245,7 @@ public:
         if (Screen::keyboardEvent(key, scancode, action, modifiers))
             return true;
 
-        // If the ESC key was pressed, set invisible and report input handled.
+        // If the ESC key was pressed, close the app.
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
             setVisible(false);
             return true;
