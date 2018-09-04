@@ -101,6 +101,11 @@ public:
         positions.col(10) << 0.850641f, -0.447215f, 0.276385f;
         positions.col(11) << 0.0f, -1.0f, 0.0f;
 
+        nanogui::MatrixXf normals(3, 12);
+        for (int i = 0; i < positions.cols(); i++) {
+            normals.col(i) = positions.col(i).normalized();
+        }
+
         // Vertex colors, pretty arbitrary.
         nanogui::MatrixXf colors(3, 12);
         colors.col(0) << 1, 0, 0;
@@ -116,11 +121,16 @@ public:
         colors.col(10) << 0, 1, 0;
         colors.col(11) << 1, 0, 0;
 
-        // Use the shader program, and send vertex data buffers.
+        // Use the shader program, sending vertex and uniform data.
         mShader.bind();
         mShader.uploadIndices(indices);
-        mShader.uploadAttrib("position", positions);
+        mShader.uploadAttrib("pos", positions);
         mShader.uploadAttrib("color", colors);
+        mShader.uploadAttrib("normal", normals);
+        mShader.setUniform("lightColor", nanogui::Vector3f(1.0f, 0.9f, 1.0f));
+        mShader.setUniform("lightPos", nanogui::Vector3f(-0.7f, 0.4f, -1.4f));
+        mShader.setUniform("viewPos", nanogui::Vector3f(0.0f, 0.0f, -2.0f));
+
 
         // Initialize transforms.
         projection = nanogui::frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 10.0f);
@@ -149,12 +159,13 @@ public:
         // Use the Canvas' shader program. Includes vertex data.
         mShader.bind();
         
-        // Update transform matrix and send it to the shader.
-        mvp = projection * view * model;
-        mShader.setUniform("modelViewProj", mvp);
+        // Send transform data to the shader.
+        mShader.setUniform("model", model);
+        mShader.setUniform("view", view);
+        mShader.setUniform("projection", projection);
 
-        glEnable(GL_DEPTH_TEST);
         // Draw triangles, assuming the shader has vertex and index data.
+        glEnable(GL_DEPTH_TEST);
         mShader.drawIndexed(GL_TRIANGLES, 0, 20);
         glDisable(GL_DEPTH_TEST);
     }
