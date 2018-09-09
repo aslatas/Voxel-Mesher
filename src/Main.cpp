@@ -25,9 +25,12 @@
 #include <nanogui/colorwheel.h>
 #include <nanogui/glcanvas.h>
 
+#include "Shader.h"
+
 // For logging.
 #include <iostream>
 #include <string>
+#include <stdio.h>
 
 // Includes for the GLTexture class. 
 #include <cstdint>
@@ -47,7 +50,6 @@ class Canvas : public nanogui::GLCanvas
 {
 public:
 
-
     /**
      * Constructor creates the GL Canvas in the specified parent Widget.
      * Creates vertex and index buffers and shaders.
@@ -57,12 +59,14 @@ public:
      */
     Canvas(Widget *parent) : nanogui::GLCanvas(parent)
     {
-        // Initialize the shader program and the vertex array object.
-        if (!mShader.initFromFiles("VertexColor", "../resources/shaders/VertexColor.vert", "../resources/shaders/VertexColor.frag")) {
+        std::string vertexPath[1] = { "../resources/shaders/VertexColor.vert" };
+        std::string fragmentPath[2] = { "../resources/shaders/Lights.frag", "../resources/shaders/VertexColor.frag" };
+        // Read shaders from file. Fragment shader is divided into two files.
+        if (!shader.initFromFiles("VertexColor", vertexPath, fragmentPath, nullptr, 1, 2, 0)) {
             std::cerr << "Failed to initialize shaders." << std::endl;
         }
 
-
+        arcball.setSize(size());
         // Index buffer. Counter-clockwise winding order.
         nanogui::MatrixXu indices(3, 20);
         indices.col(0) << 0, 2, 1;
@@ -106,38 +110,40 @@ public:
             normals.col(i) = positions.col(i).normalized();
         }
 
-        // Vertex colors, pretty arbitrary.
-        nanogui::MatrixXf colors(3, 12);
-        colors.col(0) << 1, 0, 0;
-        colors.col(1) << 0, 1, 0;
-        colors.col(2) << 0, 1, 1;
-        colors.col(3) << 0.5f, 0.5f, 0;
-        colors.col(4) << 0, 0.5f, 0.5f;
-        colors.col(5) << 0.5f, 0, 0.5f;
-        colors.col(6) << 0.5f, 0, 0.5f;
-        colors.col(7) << 0, 0.5f, 0.5f;
-        colors.col(8) << 0.5f, 0.5f, 0;
-        colors.col(9) << 0, 0, 1;
-        colors.col(10) << 0, 1, 0;
-        colors.col(11) << 1, 0, 0;
-
         // Use the shader program, sending vertex and uniform data.
-        mShader.bind();
-        mShader.uploadIndices(indices);
-        mShader.uploadAttrib("pos", positions);
-        mShader.uploadAttrib("color", colors);
-        mShader.uploadAttrib("normal", normals);
-        mShader.setUniform("lightColor", nanogui::Vector3f(1.0f, 0.9f, 1.0f));
-        mShader.setUniform("lightPos", nanogui::Vector3f(-0.7f, 0.4f, -1.4f));
-        mShader.setUniform("viewPos", nanogui::Vector3f(0.0f, 0.0f, -2.0f));
+        shader.bind();
+        shader.uploadIndices(indices);
+        shader.uploadAttrib("vertexPosition", positions);
+        shader.uploadAttrib("vertexNormal", normals);
 
+        shader.setUniform("material.ambient", nanogui::Vector3f(1.0f, 0.5f, 0.31f));
+        shader.setUniform("material.diffuse", nanogui::Vector3f(1.0f, 0.5f, 0.31f));
+        shader.setUniform("material.specular", nanogui::Vector3f(0.5f, 0.5f, 0.5f));
+        shader.setUniform("material.shininess", 32.0f);
+
+        shader.setUniform("viewPosition", cameraPosition);
+        shader.setUniform("numPointLights", 1);
+
+        shader.setUniform("pointLights[0].position", nanogui::Vector3f(2.0f, 0.0f, 0.0f));
+        shader.setUniform("pointLights[0].ambient", nanogui::Vector3f(0.2f, 0.2f, 0.2f));
+        shader.setUniform("pointLights[0].diffuse", nanogui::Vector3f(0.5f, 0.5, 0.5f));
+        shader.setUniform("pointLights[0].specular", nanogui::Vector3f(1.0f, 1.0f, 1.0f));
+        shader.setUniform("pointLights[0].constant", 1.0f);
+        shader.setUniform("pointLights[0].linear", 0.14f);
+        shader.setUniform("pointLights[0].quadratic", 0.07f);
+
+        shader.setUniform("directionalLight.direction", nanogui::Vector3f(1.0f, -1.0f, 1.0f));
+        shader.setUniform("directionalLight.ambient", nanogui::Vector3f(0.2f, 0.2f, 0.2f));
+        shader.setUniform("directionalLight.diffuse", nanogui::Vector3f(0.5f, 0.5f, 0.5f));
+        shader.setUniform("directionalLight.specular", nanogui::Vector3f(1.0f, 1.0f, 1.0f));
 
         // Initialize transforms.
         projection = nanogui::frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 10.0f);
-        view = nanogui::lookAt(nanogui::Vector3f(0.0f, 0.0f, -2.0f), nanogui::Vector3f(0.0f, 0.0f, 0.0f), nanogui::Vector3f(0.0f, 1.0f, 0.0f));
+        view = nanogui::lookAt(cameraPosition, cameraPosition + cameraDirection, nanogui::Vector3f(0.0f, 1.0f, 0.0f));
         model.setIdentity();
+        rot = model;
 
-
+        lastFrameTime = glfwGetTime();
     }
 
     /**
@@ -146,7 +152,7 @@ public:
      */
     ~Canvas()
     {
-        mShader.free();
+        shader.free();
     }
 
     /**
@@ -156,18 +162,38 @@ public:
      */
     virtual void drawGL() override
     {
-        // Use the Canvas' shader program. Includes vertex data.
-        mShader.bind();
+        nanogui::Vector3f cameraForward = nanogui::Vector3f(0.0f, 0.0f, 1.0f);
+        nanogui::Vector3f cameraRight = nanogui::Vector3f(1.0f, 0.0f, 0.0f);
+        float sensitivity = 1.0f;
+
+        if (glfwGetKey(screen()->glfwWindow(), GLFW_KEY_W) == GLFW_PRESS)
+            cameraPosition += cameraForward * sensitivity * deltaTime();
+        if (glfwGetKey(screen()->glfwWindow(), GLFW_KEY_S) == GLFW_PRESS)
+            cameraPosition -= cameraForward * sensitivity * deltaTime();
+        if (glfwGetKey(screen()->glfwWindow(), GLFW_KEY_A) == GLFW_PRESS)
+            cameraPosition += cameraRight * sensitivity * deltaTime();
+        if (glfwGetKey(screen()->glfwWindow(), GLFW_KEY_D) == GLFW_PRESS)
+            cameraPosition -= cameraRight * sensitivity * deltaTime();
+
+        view = nanogui::lookAt(cameraPosition, cameraPosition + cameraDirection, nanogui::Vector3f(0.0f, 1.0f, 0.0f));
         
+        // Use the Canvas' shader program. Includes vertex data.
+        shader.bind();
+
         // Send transform data to the shader.
-        mShader.setUniform("model", model);
-        mShader.setUniform("view", view);
-        mShader.setUniform("projection", projection);
+        shader.setUniform("viewPosition", cameraPosition);
+        shader.setUniform("model", rot);
+        shader.setUniform("view", view);
+        shader.setUniform("projection", projection);
 
         // Draw triangles, assuming the shader has vertex and index data.
         glEnable(GL_DEPTH_TEST);
-        mShader.drawIndexed(GL_TRIANGLES, 0, 20);
+        shader.drawElementsInstanced(GL_TRIANGLES, 0, 20, 1);
         glDisable(GL_DEPTH_TEST);
+
+        double currentFrameTime = glfwGetTime();
+        mDeltaTime = currentFrameTime - lastFrameTime;
+        lastFrameTime = currentFrameTime;
     }
 
     /**
@@ -180,50 +206,40 @@ public:
      */
     virtual bool mouseButtonEvent(const nanogui::Vector2i &p, int button, bool down, int modifiers) override
     {
-        // If right click is pressed, update last position and return true.
-        if (down && button == 1) {
-            dragPos = p;
+        // If right click is pressed, rotate the object.
+        if (button == GLFW_MOUSE_BUTTON_1) {
+            nanogui::Vector2i transformedP = nanogui::Vector2i(p.x() - position().x(), p.y() - position().y() + 200);
+            arcball.button(transformedP, down);
             return true;
         }
-
         // If input wasn't handled, return false.
         return false;
     }
 
-    /**
-     * Callback for mouse drag input. On right click and drag, rotates the canvas object.
-     * @param p Cursor screen position.
-     * @param rel Cursor release position.
-     * @param button Mouse button responsible for the event.
-     * @param modifiers Modifier keys held, such as ctrl or shift.
-     * @return True if this event handled the input, false otherwise.
-     */
-    virtual bool mouseDragEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override
+    virtual bool mouseMotionEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override
     {
-        // If right click is held, update model rotation.
-        if (button == 2) {
-            // Store rotation in a quaternion, using last mouse position and current mouse position to generate angle.
-            Eigen::Quaternionf xRot, yRot;
-            xRot = Eigen::Quaternionf(Eigen::AngleAxisf((dragPos.y() - p.y()) * sens, nanogui::Vector3f::UnitX()));
-            yRot = Eigen::Quaternionf(Eigen::AngleAxisf((p.x() - dragPos.x()) * sens, nanogui::Vector3f::UnitY()));
-
-            // Generate rotation matrix and apply it to the model matrix.
-            nanogui::Matrix4f transform = nanogui::Matrix4f::Identity();
-            transform.topLeftCorner<3, 3>() = (xRot * yRot).toRotationMatrix();
-            model = transform * model;
-
-            // Update last position and return true.
-            dragPos = p;
+        
+        if (button == GLFW_MOUSE_BUTTON_2) {
+            nanogui::Vector2i transformedP = nanogui::Vector2i(p - position());
+            nanogui::Vector2i invertedP = nanogui::Vector2i(transformedP.x(), -transformedP.y() + 200);
+            arcball.motion(invertedP);
+            rot = model * arcball.matrix();
             return true;
         }
 
-        // If no input was handled, return false.
         return false;
+    }
+
+    /**
+     * Gets the frame render time.
+     */
+    double deltaTime() {
+        return mDeltaTime;
     }
 
 private:
     /** Canvas shader object. Contains both the shader program and VAOs.*/
-    nanogui::GLShader mShader;
+    Shader shader;  
     /** Transform matrix for the rendered shape. */
     nanogui::Matrix4f mvp;
     /** Perspective projection matrix. */
@@ -232,10 +248,24 @@ private:
     nanogui::Matrix4f view;
     /** Model matrix. */
     nanogui::Matrix4f model;
+    /** Temporary arcball rotation matrix. */
+    nanogui::Matrix4f rot = nanogui::Matrix4f::Identity();
+    /** Camera position. */
+    nanogui::Vector3f cameraPosition = nanogui::Vector3f(0.0f, 0.0f, -2.0f);
+    /** Camera rotation. */
+    nanogui::Vector3f cameraDirection = nanogui::Vector3f(0.0f, 0.0f, 1.0f);
+    /** Per-frame movement vector. */
+    nanogui::Vector3f movement = nanogui::Vector3f(0.0f, 0.0f, 0.0f);
     /** Mouse sensitivity. */
     float sens = 0.01f;
+    /** Mouse rotation arcball. */
+    nanogui::Arcball arcball;
     /** Last position of the mouse, used for mouse dragging. */
     Eigen::Vector2i dragPos = Eigen::Vector2i(0, 0);
+    /** Frame time. */
+    double mDeltaTime;
+    /** Time of last frame. */
+    double lastFrameTime;
 };
 
 /**
@@ -289,11 +319,12 @@ public:
      * @param modifiers Held modifier keys, such as shift or ctrl.
      * @return True if input has been handled. Used for layered input handling.
      */
-    virtual bool keyboardEvent(int key, int scancode, int action, int modifiers)
+    virtual bool keyboardEvent(int key, int scancode, int action, int modifiers) override
     {
         // If the input was handled by the outer screen, do nothing.
-        if (Screen::keyboardEvent(key, scancode, action, modifiers))
+        if (Screen::keyboardEvent(key, scancode, action, modifiers)) {
             return true;
+        }
 
         // If the ESC key was pressed, close the app.
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -309,14 +340,17 @@ public:
      * Draws the screen in its current state.
      * @param ctx NanoGUI context to use for drawing.
      */
-    virtual void draw(NVGcontext *ctx)
+    virtual void draw(NVGcontext *ctx) override
     {
         // Draw parent screen.
         Screen::draw(ctx);
     }
+
+
 private:
     /** GL Canvas to use for the 3D viewport. */
     Canvas * mCanvas;
+
 };
 
 /**
@@ -337,7 +371,7 @@ int main(int argc, char ** argv)
             nanogui::ref<GuiApp> app = new GuiApp();
             app->drawAll();
             app->setVisible(true);
-            nanogui::mainloop();
+            nanogui::mainloop(16);
         }
 
         // After loop completes, shutdown NanoGUI.
@@ -352,5 +386,5 @@ int main(int argc, char ** argv)
     }
 
     // If program completed and NanoGUI shut down, exit in success.
-    return 0;
+    return EXIT_SUCCESS;
 }

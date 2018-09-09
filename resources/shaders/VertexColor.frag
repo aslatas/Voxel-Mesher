@@ -1,28 +1,33 @@
-#version 410
+/**
+ * @file VertexColor.frag
+ * Fragment shader for basic Blinn-Phong lighting of a surface.
+ * Calculates lit fragment color from view position and world-space vertex data.
+ */
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
-uniform vec3 lightColor;
+ // Used by a live compilation plugin I use in MSVS.
+//! #include "Lights.frag"
 
-in vec3 frag_color;
-in vec3 frag_normal;
-in vec3 frag_pos;
+/** Position of the camera in world space. */
+uniform vec3 viewPosition;
 
+/** Vertex position in world space. */
+in vec3 vert_pos;
+/** Vertex normal in world space. */
+in vec3 vert_normal;
+
+/** Final fragment color. */
 out vec4 color;
 
+/**
+ * Outputs lit color based on material and light properties.
+ */
 void main()
 {
-    float ambientStrength = 0.08;
-    float specularStrength = 0.5;
+    // Normalize the vertex normals just in case.
+    vec3 normal = normalize(vert_normal);
+    // Calculate the view direction from camera and vertex position.
+    vec3 viewDir = normalize(vert_pos - viewPosition);
 
-    vec3 normal = normalize(frag_normal);
-    vec3 lightDir = normalize(lightPos - frag_pos);
-    vec3 viewDir = normalize(viewPos - frag_pos);
-    vec3 halfDir = normalize(lightDir + viewDir);
-
-    vec3 ambient = ambientStrength * lightColor;
-    vec3 diffuse = max(dot(normal, lightDir), 0.0f) * lightColor;
-    vec3 specular = specularStrength * lightColor * pow(max(dot(viewDir, halfDir), 0.0), 32);
-    color = vec4((ambient + diffuse + specular) * frag_color, 1.0);
-
+    // Calculate the light contribution and use it as the final color.
+    color = vec4(calculateTotalLight(directionalLight, pointLights, normal, vert_pos, viewDir), 1.0);
 }
