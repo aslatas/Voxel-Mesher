@@ -13,6 +13,8 @@ uniform mat4 view;
 /** View to Clip transform. */
 uniform mat4 projection;
 
+/** Cube position in world space. */
+in vec3 cubePosition;
 /** Vertex position in local space. */
 in vec3 vertexPosition;
 /** Vertex normal in local space. */
@@ -29,7 +31,7 @@ out vec3 vert_normal;
  */
 void main() 
 {
-    vert_pos = vec3(model * vec4(vertexPosition, 1.0));
+    vert_pos = vec3(model * vec4(vertexPosition + vec3(gl_InstanceID % 16, (gl_InstanceID / 16) % 16, gl_InstanceID / 256), 1.0));
     vert_normal = vec3(model * vec4(vertexNormal, 1.0));
 
     gl_Position = projection * view * vec4(vert_pos, 1.0);

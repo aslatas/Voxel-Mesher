@@ -68,44 +68,46 @@ public:
 
         arcball.setSize(size());
         // Index buffer. Counter-clockwise winding order.
-        nanogui::MatrixXu indices(3, 20);
+        nanogui::MatrixXu indices(3, 12);
         indices.col(0) << 0, 2, 1;
-        indices.col(1) << 0, 3, 2;
-        indices.col(2) << 0, 4, 3;
-        indices.col(3) << 0, 5, 4;
-        indices.col(4) << 0, 1, 5;
-        indices.col(5) << 6, 3, 4;
-        indices.col(6) << 6, 4, 7;
-        indices.col(7) << 7, 4, 5;
-        indices.col(8) << 7, 5, 8;
-        indices.col(9) << 8, 5, 1;
-        indices.col(10) << 8, 1, 9;
-        indices.col(11) << 9, 1, 2;
-        indices.col(12) << 9, 2, 10;
-        indices.col(13) << 10, 2, 3;
-        indices.col(14) << 10, 3, 6;
-        indices.col(15) << 11, 6, 7;
-        indices.col(16) << 11, 7, 8;
-        indices.col(17) << 11, 8, 9;
-        indices.col(18) << 11, 9, 10;
-        indices.col(19) << 11, 10, 6;
+        indices.col(1) << 3, 1, 2;
+        indices.col(2) << 0, 4, 2;
+        indices.col(3) << 6, 2, 4;
+        indices.col(4) << 3, 2, 6;
+        indices.col(5) << 7, 3, 6;
+        indices.col(6) << 1, 3, 7;
+        indices.col(7) << 5, 1, 7;
+        indices.col(8) << 0, 1, 5;
+        indices.col(9) << 4, 0, 5;
+        indices.col(10) << 4, 5, 6;
+        indices.col(11) << 7, 6, 5;
 
-        // Vertex locations, generated with Blender.
-        nanogui::MatrixXf positions(3, 12);
-        positions.col(0) << 0.0f, 1.0f, 0.0f;
-        positions.col(1) << 0.0f, 0.447215f, -0.894414f;
-        positions.col(2) << 0.850649f, 0.447215f, -0.276393f;
-        positions.col(3) << 0.52572f, 0.447215f, 0.723599f;
-        positions.col(4) << -0.525728f, 0.447215f, 0.723594f;
-        positions.col(5) << -0.850641f, 0.447215f, -0.276385f;
-        positions.col(6) << 0.0f, -0.447215f, 0.894414f;
-        positions.col(7) << -0.850649f, -0.447215f, 0.276393f;
-        positions.col(8) << -0.52572f, -0.447215f, -0.723599f;
-        positions.col(9) << 0.525728f, -0.447215f, -0.723594f;
-        positions.col(10) << 0.850641f, -0.447215f, 0.276385f;
-        positions.col(11) << 0.0f, -1.0f, 0.0f;
+        // Vertex locations of a cube.
+        nanogui::MatrixXf positions(3, 8);
+        positions.col(0) << -0.5f,  0.5f,  0.5f;
+        positions.col(1) <<  0.5f,  0.5f,  0.5f;
+        positions.col(2) << -0.5f, -0.5f,  0.5f;
+        positions.col(3) <<  0.5f, -0.5f,  0.5f;
+        positions.col(4) << -0.5f,  0.5f, -0.5f;
+        positions.col(5) <<  0.5f,  0.5f, -0.5f;
+        positions.col(6) << -0.5f, -0.5f, -0.5f;
+        positions.col(7) <<  0.5f, -0.5f, -0.5f;
 
-        nanogui::MatrixXf normals(3, 12);
+        // Transforms of the instanced cubes.
+        nanogui::MatrixXf transforms(3, 8);
+        transforms.col(0) << 0.0f, 0.0f, 0.0f;
+        transforms.col(1) << 0.0f, 0.0f, 1.0f;
+        transforms.col(2) << 0.0f, 1.0f, 0.0f;
+        transforms.col(3) << 0.0f, 1.0f, 1.0f;
+        transforms.col(4) << 1.0f, 0.0f, 0.0f;
+        transforms.col(5) << 1.0f, 0.0f, 1.0f;
+        transforms.col(6) << 1.0f, 1.0f, 0.0f;
+        transforms.col(7) << 1.0f, 1.0f, 1.0f;
+
+
+
+
+        nanogui::MatrixXf normals(3, 8);
         for (int i = 0; i < positions.cols(); i++) {
             normals.col(i) = positions.col(i).normalized();
         }
@@ -115,6 +117,8 @@ public:
         shader.uploadIndices(indices);
         shader.uploadAttrib("vertexPosition", positions);
         shader.uploadAttrib("vertexNormal", normals);
+      //  shader.uploadAttrib("cubePosition", transforms);
+       // glVertexAttribDivisor(shader.attrib("cubePosition", true), 1);
 
         shader.setUniform("material.ambient", nanogui::Vector3f(1.0f, 0.5f, 0.31f));
         shader.setUniform("material.diffuse", nanogui::Vector3f(1.0f, 0.5f, 0.31f));
@@ -122,7 +126,7 @@ public:
         shader.setUniform("material.shininess", 32.0f);
 
         shader.setUniform("viewPosition", cameraPosition);
-        shader.setUniform("numPointLights", 1);
+        shader.setUniform("numPointLights", 0);
 
         shader.setUniform("pointLights[0].position", nanogui::Vector3f(2.0f, 0.0f, 0.0f));
         shader.setUniform("pointLights[0].ambient", nanogui::Vector3f(0.2f, 0.2f, 0.2f));
@@ -138,7 +142,7 @@ public:
         shader.setUniform("directionalLight.specular", nanogui::Vector3f(1.0f, 1.0f, 1.0f));
 
         // Initialize transforms.
-        projection = nanogui::frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 10.0f);
+        projection = nanogui::frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 1000.0f);
         view = nanogui::lookAt(cameraPosition, cameraPosition + cameraDirection, nanogui::Vector3f(0.0f, 1.0f, 0.0f));
         model.setIdentity();
         rot = model;
@@ -188,8 +192,10 @@ public:
 
         // Draw triangles, assuming the shader has vertex and index data.
         glEnable(GL_DEPTH_TEST);
-        shader.drawElementsInstanced(GL_TRIANGLES, 0, 20, 1);
+        glEnable(GL_CULL_FACE);
+        shader.drawElementsInstanced(GL_TRIANGLES, 0, 12, 4096);
         glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
 
         double currentFrameTime = glfwGetTime();
         mDeltaTime = currentFrameTime - lastFrameTime;
@@ -251,7 +257,7 @@ private:
     /** Temporary arcball rotation matrix. */
     nanogui::Matrix4f rot = nanogui::Matrix4f::Identity();
     /** Camera position. */
-    nanogui::Vector3f cameraPosition = nanogui::Vector3f(0.0f, 0.0f, -2.0f);
+    nanogui::Vector3f cameraPosition = nanogui::Vector3f(0.0f, 0.0f, -16.0f);
     /** Camera rotation. */
     nanogui::Vector3f cameraDirection = nanogui::Vector3f(0.0f, 0.0f, 1.0f);
     /** Per-frame movement vector. */
