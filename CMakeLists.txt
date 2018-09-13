@@ -4,6 +4,7 @@ cmake_minimum_required (VERSION 2.8.12)
 # Set project name.
 project(voxelmesher)
 
+set(SOURCE_FILES main.cpp )
 # Options for resource directory locations.
 set(RESOURCE_DIR ${CMAKE_SOURCE_DIR}/resources CACHE PATH "Location of the resources folder")
 
@@ -29,7 +30,7 @@ set_property(TARGET glfw glfw_objects nanogui PROPERTY FOLDER "dependencies")
 add_definitions(${NANOGUI_EXTRA_DEFS})
 
 # Set include directories.
-include_directories(${CMAKE_SOURCE_DIR}/include ext/nanogui/include ${NANOGUI_EXTRA_INCS})
+include_directories(include ext/nanogui/include ${NANOGUI_EXTRA_INCS})
 
 # Add executable.
 add_executable(voxelmesher src/Main.cpp include/Shader.h)
