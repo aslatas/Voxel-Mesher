@@ -7,6 +7,8 @@
 #pragma once
 
 #include <nanogui/glcanvas.h>
+#include "Camera.h"
+#include "Shader.h"
 
 /**
  * @class Canvas
@@ -14,7 +16,7 @@
  */
 class Canvas : public nanogui::GLCanvas
 {
-  public:
+public:
     /**
      * @brief
      * Constructor initializes the canvas from a reference to its parent.
@@ -28,4 +30,8 @@ class Canvas : public nanogui::GLCanvas
      * draw code here.
      */
     virtual void drawGL() override;
+
+private:
+    Camera* mCamera;
+    Shader* mShader;
 };

@@ -21,13 +21,16 @@ set(VOXELMESHER_SOURCES
 
 # Set additional resources, like shaders.
 set(VOXELMESHER_RESOURCES
+    resources/shaders/Trivial.frag
+    resources/shaders/Trivial.vert
     resources/shaders/Lights.frag
     resources/shaders/VertexColor.frag
     resources/shaders/VertexColor.vert)
 
 if(BUILD_TESTS)
     set(VOXELMESHER_TESTS
-        test/VObjectTest.cpp)
+        test/VObjectTest.cpp
+        test/MatrixPrinting.h)
 endif()
 
 # Set library output directories.

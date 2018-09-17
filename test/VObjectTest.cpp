@@ -4,6 +4,7 @@
  * Contains tests for VObject class.
  * @author Matthew McLaurin
  */
+#include "MatrixPrinting.h"
 #include "VObject.h"
 #include <gtest/gtest.h>
 
@@ -39,49 +40,35 @@ TEST(VObjectTest, TestAccessors)
     ASSERT_EQ(object->up(), Vec3f::UnitY())
         << "VObject should be initialized with forward (0, 1, 0) but wasn't.";
 
-    // Set VObject location and test that its field and matrix update.
-    object->setLocation(Vec3f(1.0f, 2.0f, 3.0f));
-    expTransform.block<3, 1>(0, 3) << 1.0f, 2.0f, 3.0f;
-    ASSERT_EQ(object->location(), Vec3f(1.0f, 2.0f, 3.0f));
+    
+    // Set VObject scale and test that its field and matrix update.
+    object->setScale(Vec3f(3.0f, 3.0f, 3.0f));
+    expTransform.topLeftCorner<3, 3>() = Mat3f::Identity() * 3.0f;
+    ASSERT_EQ(object->scale(), Vec3f(3.0f, 3.0f, 3.0f));
     ASSERT_EQ(object->model(), expTransform);
-    // After translating the object by (1, 2, 3) the transform should be:
-    // [1  0  0  1]
-    // [0  1  0  2]
-    // [0  0  1  3]
-    // [0  0  0  1]
 
     // Update the combined transform, to be tested later.
     combinedTransform = expTransform;
 
     // Set VObject rotation and test that its field and matrix update.
     expTransform.setIdentity();
-    object->setLocation(Vec3f::Zero());
+    object->setScale(Vec3f::Ones());
     object->setRotation(1.0f, 0.0f, 0.0f);
     Quatf rQuat = Eigen::AngleAxisf(1.0f, Vec3f::UnitX()) * Quatf::Identity();
     expTransform.topLeftCorner<3, 3>() = rQuat.toRotationMatrix();
     ASSERT_EQ(object->rotation(), expTransform);
     ASSERT_EQ(object->model(), expTransform);
-    // After rotating the object by 1 rad around X, the transform should be:
-    // [1       0       0       0]
-    // [0   cos(1) -sin(1)      0]
-    // [0   sin(1)  cos(1)      0]
-    // [0       0       0       1]
 
     // Update the combined transform, to be tested later.
     combinedTransform = expTransform * combinedTransform;
-
-    // Set VObject scale and test that its field and matrix update.
+    
+    // Set VObject location and test that its field and matrix update.
     expTransform.setIdentity();
     object->setRotation(0.0f, 0.0f, 0.0f);
-    object->setScale(Vec3f(3.0f, 3.0f, 3.0f));
-    expTransform.topLeftCorner<3, 3>() = Mat3f::Identity() * 3.0f;
-    ASSERT_EQ(object->scale(), Vec3f(3.0f, 3.0f, 3.0f));
+    object->setLocation(Vec3f(1.0f, 2.0f, 3.0f));
+    expTransform.block<3, 1>(0, 3) << 1.0f, 2.0f, 3.0f;
+    ASSERT_EQ(object->location(), Vec3f(1.0f, 2.0f, 3.0f));
     ASSERT_EQ(object->model(), expTransform);
-    // After scaling the object by (3, 3, 3) the transform should be;
-    // [3  0  0  0]
-    // [0  3  0  0]
-    // [0  0  3  0]
-    // [0  0  0  1]
 
     // Update combined transform to contain location, rotation, and scale.
     combinedTransform = expTransform * combinedTransform;
@@ -90,10 +77,29 @@ TEST(VObjectTest, TestAccessors)
     object->setLocation(Vec3f(1.0f, 2.0f, 3.0f));
     object->setRotation(1.0f, 0.0f, 0.0f);
     object->setScale(Vec3f(3.0f, 3.0f, 3.0f));
-    ASSERT_EQ(object->model(), combinedTransform);
+    EXPECT_EQ(object->model(), combinedTransform);
 }
 
+/**
+ * @Test
+ * Tests that translating and rotation a VObject results in expected behavior.
+ */
 TEST(VObjectTest, TestTransformations)
 {
-    ASSERT_EQ(1, 1) << "This one should pass.";
+    // Initialize a VObject for testing.
+    VObject* object = new VObject();
+    ASSERT_EQ(object->location(), Vec3f::Zero());
+    ASSERT_EQ(object->rotation(), Mat4f::Identity());
+    ASSERT_EQ(object->scale(), Vec3f::Ones());
+
+    // Test that translation functions as expected.
+    object->translate(Vec3f(3.0f, 2.0f, 1.0f));
+    EXPECT_EQ(object->location(), Vec3f(3.0f, 2.0f, 1.0f));
+
+    // Test that rotation functions as expected.
+    object->rotate(Quatf(Eigen::AngleAxisf(1.0f, Vec3f::UnitY())));
+    Mat3f expRotation =
+        Quatf(Eigen::AngleAxisf(1.0f, Vec3f::UnitY())).toRotationMatrix();
+    Mat3f actRotation = object->rotation().topLeftCorner<3, 3>();
+    EXPECT_EQ(actRotation, expRotation);
 }

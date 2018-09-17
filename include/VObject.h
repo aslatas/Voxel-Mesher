@@ -170,10 +170,10 @@ public:
     void VObject::rotate(float pitch, float yaw, float roll)
     {
         Eigen::AngleAxisf xRot = Eigen::AngleAxisf(pitch, Vec3f::UnitX());
-        Eigen::AngleAxisf yRot = Eigen::AngleAxisf(pitch, Vec3f::UnitY());
-        Eigen::AngleAxisf zRot = Eigen::AngleAxisf(pitch, Vec3f::UnitZ());
+        Eigen::AngleAxisf yRot = Eigen::AngleAxisf(yaw, Vec3f::UnitY());
+        Eigen::AngleAxisf zRot = Eigen::AngleAxisf(roll, Vec3f::UnitZ());
 
-        mRotation *= (xRot * yRot * zRot);
+        mRotation *= xRot * yRot * zRot;
         updateModel();
     }
 
@@ -195,7 +195,7 @@ private:
     void VObject::updateModel()
     {
         mModel =
-            Eigen::Affine3f(Eigen::Scaling(mScale)).matrix() * rotation() *
-            Eigen::Affine3f(Eigen::Translation<float, 3>(mLocation)).matrix();
+            Eigen::Affine3f(Eigen::Translation<float, 3>(mLocation)).matrix() *
+            rotation() * Eigen::Affine3f(Eigen::Scaling(mScale)).matrix();
     }
 };
