@@ -1,16 +1,31 @@
+/**
+ * @headerfile Canvas.h ""
+ * Contains Canvas class declaration.
+ * @author Matthew McLaurin
+ */
+
 #pragma once
 
 #include <nanogui/glcanvas.h>
 
-class Canvas : nanogui::GLCanvas
+/**
+ * @class Canvas
+ * OpenGL drawing canvas. Provides utilties for custom drawing.
+ */
+class Canvas : public nanogui::GLCanvas
 {
-public:
-    Canvas(Widget *parent);
+  public:
+    /**
+     * @brief
+     * Constructor initializes the canvas from a reference to its parent.
+     * @param parent Pointer to the Widget that houses the Canvas.
+     */
+    Canvas(Widget* parent);
 
-    ~Canvas();
-
+    /**
+     * @brief
+     * Called every update during drawing. Place custom
+     * draw code here.
+     */
     virtual void drawGL() override;
-
-    virtual bool mouseButtonEvent(const nanogui::Vector2i &p, int button, bool down, int modifiers) override;
-    virtual bool mouseMotionEvent(const nanogui::Vector2i &p, const nanogui::Vector2i &rel, int button, int modifiers) override;
 };

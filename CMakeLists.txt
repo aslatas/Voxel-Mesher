@@ -1,10 +1,34 @@
 # Minimum version is the same as NanoGUI.
-cmake_minimum_required (VERSION 3.12 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.10 FATAL_ERROR)
 
 # Set project name.
 project(voxelmesher)
 
-set(VOXELMESHER_SOURCES "" CACHE INTERNAL "All project source files.")
+# Option to build tests.
+option(BUILD_TESTS "Build voxelmesher tests." ON)
+
+# Set project sources.
+set(VOXELMESHER_SOURCES
+    src/VoxelMesher.cpp
+    src/stb_image.cpp
+    include/MatrixTypes.h
+    include/Camera.h
+    include/Canvas.h src/Canvas.cpp
+    include/GLWindow.h src/GLWindow.cpp
+    include/Shader.h
+    include/VObject.h
+    .clang-format)
+
+# Set additional resources, like shaders.
+set(VOXELMESHER_RESOURCES
+    resources/shaders/Lights.frag
+    resources/shaders/VertexColor.frag
+    resources/shaders/VertexColor.vert)
+
+if(BUILD_TESTS)
+    set(VOXELMESHER_TESTS
+        test/VObjectTest.cpp)
+endif()
 
 # Set library output directories.
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
@@ -16,21 +40,8 @@ set(NANOGUI_BUILD_EXAMPLE OFF CACHE BOOL " " FORCE)
 set(NANOGUI_BUILD_PYTHON  OFF CACHE BOOL " " FORCE)
 set(NANOGUI_INSTALL       OFF CACHE BOOL " " FORCE)
 
-# Function to add sources to a list with complete path.
-function(ADD_SOURCES)
-    set(NEW_SOURCES ${ARGN})
-    file(RELATIVE_PATH FILE_PATH ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-    list(TRANSFORM NEW_SOURCES PREPEND "${FILE_PATH}/")
-    list(APPEND VOXELMESHER_SOURCES ${NEW_SOURCES})
-    set(VOXELMESHER_SOURCES ${VOXELMESHER_SOURCES} CACHE INTERNAL "All project source files.")
-    message(STATUS ${VOXELMESHER_SOURCES})
-endfunction()
-
-# Add subdirectories
-add_subdirectory(${CMAKE_SOURCE_DIR}/src)
-add_subdirectory(${CMAKE_SOURCE_DIR}/include)
-add_subdirectory(${CMAKE_SOURCE_DIR}/resources/shaders)
-add_subdirectory(${CMAKE_SOURCE_DIR}/ext/nanogui)
+# Add NanoGUI as a subdirectory.
+add_subdirectory(ext/nanogui)
 
 # Make the NanoGUI targets into dependencies.
 set_property(TARGET glfw glfw_objects nanogui PROPERTY FOLDER "dependencies")
@@ -39,14 +50,30 @@ set_property(TARGET glfw glfw_objects nanogui PROPERTY FOLDER "dependencies")
 add_definitions(${NANOGUI_EXTRA_DEFS})
 
 # Set include directories.
-include_directories(include ext/nanogui/include ${NANOGUI_EXTRA_INCS})
+include_directories(
+    include
+    ext/nanogui/include
+    ${NANOGUI_EXTRA_INCS})
 
-message(STATUS "-" ${VOXELMESHER_SOURCES})
 # Add executable.
-add_executable(voxelmesher ${VOXELMESHER_SOURCES})
+add_executable(voxelmesher ${VOXELMESHER_SOURCES} ${VOXELMESHER_RESOURCES})
+
+# Put resources into their own folder in the IDE.
+source_group("Resource Files" FILES ${VOXELMESHER_RESOURCES})
 
 # Link against NanoGUI libraries.
 target_link_libraries(voxelmesher nanogui ${NANOGUI_EXTRA_LIBS})
+
+# Setup testing if option is enabled.
+if(BUILD_TESTS)
+    enable_testing()
+    include(GoogleTest)
+    add_subdirectory(ext/googletest)
+    include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+    add_executable(voxelmesherTest ${VOXELMESHER_TESTS})
+    target_link_libraries(voxelmesherTest gtest gtest_main)
+    gtest_discover_tests(voxelmesherTest)
+endif()
 
 # Copy resources to the executable path on build.
 add_custom_command(
