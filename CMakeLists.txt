@@ -15,8 +15,9 @@ set(VOXELMESHER_SOURCES
     include/Camera.h
     include/Canvas.h src/Canvas.cpp
     include/GLWindow.h src/GLWindow.cpp
+    include/Player.h src/Player.cpp
     include/Shader.h
-    include/VObject.h
+    include/VObject.h src/VObject.cpp
     .clang-format)
 
 # Set additional resources, like shaders.

@@ -1,23 +1,21 @@
 #pragma once
 
-#include "MatrixTypes.h"
 #include "VObject.h"
-
 
 class Camera : public VObject
 {
 public:
     Mat4f Camera::view() { return mView; }
     Mat4f Camera::projection() { return mProjection; }
-    void  Camera::setViewMatrix(Vec3f location, Vec3f forward, Vec3f up)
+    void  Camera::updateViewMatrix()
     {
-        mView = nanogui::lookAt(location, location + forward, up);
+        mView = nanogui::lookAt(location(), location() + forward(), up());
     }
 
 protected:
-    Camera::Camera()
+    Camera::Camera() : VObject()
     {
-        setViewMatrix(location(), forward(), Vec3f::UnitY());
+        updateViewMatrix();
     }
 
     Mat4f mView;
@@ -39,7 +37,8 @@ public:
 
 class OrthoCamera : Camera
 {
-    OrthoCamera::OrthoCamera(float near, float far, float width, float height)
+    OrthoCamera::OrthoCamera(
+        float near, float far, float width, float height)
         : Camera()
     {
         mProjection = nanogui::ortho(-width / 2.0f, width / 2.0f,

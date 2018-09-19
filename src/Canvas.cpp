@@ -1,12 +1,9 @@
 
 #include "Canvas.h"
-#include "Shader.h"
-#include "GLWindow.h"
 
 Canvas::Canvas(Widget* parent) : GLCanvas(parent)
 {
-    mCamera = new PerspectiveCamera(9.0f / 16.0f, 90.0f, 0.1f, 100.0f);
-
+    mPlayer = new Player();
     mShader = new Shader();
     if (!mShader->initFromFiles("Trivial",
             &std::string("../resources/shaders/Trivial.vert"),
@@ -29,17 +26,33 @@ Canvas::Canvas(Widget* parent) : GLCanvas(parent)
     mShader->uploadAttrib("position", vertices);
     mShader->uploadIndices(indices);
 
-    mShader->setUniform("model", mCamera->model());
-    mShader->setUniform("view", mCamera->view());
-    mShader->setUniform("projection", mCamera->projection());
+    mShader->setUniform("model", (Mat4f)Mat4f::Identity());
+    mShader->setUniform("view", mPlayer->view());
+    mShader->setUniform("projection", mPlayer->projection());
+
+    lastFrameTime = 0.0;
+    currentFrameDelta = 0.0;
+    glfwSetTime(0.0);
 }
 
 void Canvas::drawGL()
 {
     mShader->bind();
-    mCamera->rotate(0.05f, 0.0f, 0.0f);
-    mCamera->setViewMatrix(mCamera->location(), mCamera->forward(), mCamera->up());
-    mShader->setUniform("view", mCamera->view());
-   // mShader->setUniform("model", mCamera->model());
+    mPlayer->addMovementInput(mPlayer->right(), 1.0f);
+    mPlayer->applyMovement(deltaTime());
+    mShader->setUniform("view", mPlayer->view());
     mShader->drawIndexed(GL_TRIANGLES, 0, 2);
+
+    updateFrameDelta(glfwGetTime());
+}
+
+double Canvas::deltaTime()
+{
+    return currentFrameDelta;
+}
+
+void Canvas::updateFrameDelta(double currentFrameTime)
+{
+    currentFrameDelta = currentFrameTime - lastFrameTime;
+    lastFrameTime = currentFrameTime;
 }

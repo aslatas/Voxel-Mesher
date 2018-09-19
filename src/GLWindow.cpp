@@ -30,12 +30,4 @@ void GLWindow::draw(NVGcontext* ctx)
 {
     // Draw parent screen.
     Screen::draw(ctx);
-    double currentTime = glfwGetTime();
-    deltaTime = currentTime - lastFrameTime;
-    lastFrameTime = currentTime;
-}
-
-double GLWindow::DeltaTime()
-{
-    return deltaTime;
 }

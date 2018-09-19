@@ -6,9 +6,10 @@
 
 #pragma once
 
-#include <nanogui/glcanvas.h>
-#include "Camera.h"
+#include "Player.h"
 #include "Shader.h"
+
+#include <nanogui/glcanvas.h>
 
 /**
  * @class Canvas
@@ -31,7 +32,27 @@ public:
      */
     virtual void drawGL() override;
 
+    /**
+     * Gets the elapsed time between frames.
+     * @return The time between the previous and current frame draws.
+     */
+    double deltaTime();
+
 private:
-    Camera* mCamera;
+    /**
+     * @brief
+     * Updates delta time for the next frame, using the current application
+     * time.
+     * @param currentFrameTime Current application frame time, in seconds.
+     */
+    void updateFrameDelta(double currentFrameTime);
+
+    /** User camera. */
+    Player* mPlayer;
+    /** Trivial shader used to draw primitives in the scene. */
     Shader* mShader;
+    /** Value returned by glfwGetTime() on the previous frame. */
+    double lastFrameTime;
+    /** Time that the last frame took to draw, in seconds. */
+    double currentFrameDelta;
 };

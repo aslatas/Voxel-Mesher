@@ -27,8 +27,7 @@ int main(int argc, char** argv)
             new GLWindow(1600, 900, "VoxelMesher 0.01");
         app->drawAll();
         app->setVisible(true);
-        glfwSetTime(0.0);
-        nanogui::mainloop(16);
+        nanogui::mainloop(5);
 
         // After loop completes, shutdown NanoGUI.
         nanogui::shutdown();

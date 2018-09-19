@@ -19,7 +19,7 @@
  */
 class GLWindow : public nanogui::Screen
 {
-  public:
+public:
     /**
      * Constructor creates window and sets base behavior. Uses 8 bit color,
      * depth and stencil buffered. Screen is windowed and non-resizeable.
@@ -45,17 +45,7 @@ class GLWindow : public nanogui::Screen
      */
     virtual void draw(NVGcontext* ctx) override;
 
-    /**
-     * Gets the elapsed time between frames.
-     * @return The time between the previous and current frame draws.
-     */
-    double DeltaTime();
-
-  private:
+private:
     /** GL Canvas to use for the 3D viewport. */
     Canvas* mCanvas;
-    /** Value returned by glfwGetTime() on the previous frame. */
-    double lastFrameTime;
-    /** Time that the last frame took to draw, in seconds. */
-    double deltaTime;
 };
